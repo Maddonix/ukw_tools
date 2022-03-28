@@ -1,6 +1,6 @@
 from faker import Faker
 
-class TestDataGen:
+class DataGenTests:
     def __init__(self):
         self.factory = Faker()
 
