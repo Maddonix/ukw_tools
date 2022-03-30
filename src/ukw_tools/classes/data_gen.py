@@ -1,6 +1,12 @@
-from faker import Faker
-from .examination import Examination
+from datetime import datetime as dt
 from pathlib import Path
+
+from faker import Faker
+
+from .annotation import MultilabelAnnotation
+from .examination import Examination
+from .report import ReportAnnotationResult, ReportPolypAnnotationResult
+
 
 class DataGen:
     def __init__(self, data_dir: Path):
@@ -20,5 +26,40 @@ class DataGen:
         )
         assert examination.path.exists()
         return examination
+
+    def multilabel_annotation(self):
+        annotation = {
+            "source": "test",
+            "annotator_id": 999,
+            "date": dt.now(),
+            "name": "test",
+            "value": 1,
+            "choices": ["test1", "test2", "test3"],
+        }
+
+        return MultilabelAnnotation(**annotation)
+
+    def polyp_report_annotation(self):
+        report = {
+            "location_segment": "sigma",
+            "location_cm": 16,
+            "size_category": "<5mm",
+            "resection": False
+        }
+
+        report = ReportPolypAnnotationResult(**report)
+        return report
+
+    def report_annotation(self):
+        report = {
+            "polyps": [self.polyp_report_annotation()],
+            "withdrawal_time": 300, # in s
+            "n_polyps": 1,
+            "indication": "screening"
+        }
+
+        return ReportAnnotationResult(**report)
+
+
 
 

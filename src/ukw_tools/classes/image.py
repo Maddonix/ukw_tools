@@ -1,18 +1,15 @@
-from typing import (
-    Dict,
-    Optional
-)
+from datetime import datetime
 from pathlib import Path
-from pydantic import (
-    BaseModel,
-    Field,
-)
+from typing import Dict, Optional
+
+from pydantic import BaseModel, Field
 
 from .base import PyObjectId
 
+
 class Image(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")
-    intervention_id: PyObjectId
+    examination_id: PyObjectId
     origin: str
     origin_category: str
     image_type: str # freeze, frame
@@ -34,5 +31,13 @@ class Image(BaseModel):
         return _
 
 class ImageCollection(BaseModel):
-    examination_id: PyObjectId
+    examination_id: Optional[PyObjectId]
+    model_id: Optional[PyObjectId]
+    type: Optional[str]
     images: Dict[int, PyObjectId]
+    date: Optional[datetime] = datetime.now()
+
+    def to_dict(self):
+        _ = self.dict(exclude_none=True)
+        _["images"] = {str(k):v for k,v in _["images"].items()}
+        return _

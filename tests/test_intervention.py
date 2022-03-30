@@ -1,12 +1,12 @@
-from ukw_tools.classes.data_gen import DataGen
 from pathlib import Path
 
+from ukw_tools.classes.data_gen import DataGen
 
 factory = DataGen(Path("tests/test_data"))
 
 def test_generate_examination_with_video():
     examination = factory.examination_with_video()
-    assert examination.is_video == True
+    assert examination.is_video is True
     assert examination.examination_type == "unknown"
 
 def test_get_video_info():

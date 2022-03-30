@@ -1,6 +1,7 @@
 from typing import (
     List,
-    Optional
+    Optional,
+    Tuple
 )
 from pathlib import Path
 from pydantic import (
@@ -31,6 +32,7 @@ class Examination(BaseModel):
     segmentation: Optional[PyObjectId]
     annotation: Optional[PyObjectId]
     prediction: Optional[PyObjectId]
+    crop: Optional[Tuple[int]] # ymin, ymax, xmin, xmax
 
     class Config:
         allow_population_by_field_name = True
@@ -53,7 +55,7 @@ class Examination(BaseModel):
 
     def get_frame_template(self):
         template = {
-            "intervention_id": self.id,
+            "examination_id": self.id,
             "origin": self.origin,
             "origin_category": self.origin_category,
             "image_type": "frame",
