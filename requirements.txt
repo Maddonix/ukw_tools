@@ -1,1 +1,13 @@
+albumentations==1.1.0
 Faker==13.3.3
+numpy==1.22.1
+opencv_contrib_python==4.5.5.62
+pydantic==1.8.2
+pymongo==3.11.4
+pytorch_lightning==1.5.9
+scikit_learn==1.0.2
+torch==1.10.1+cu113
+torchvision==0.11.2+cu113
+tqdm==4.60.0
+urllib3==1.26.4
+wandb==0.12.9
