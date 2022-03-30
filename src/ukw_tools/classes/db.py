@@ -1,6 +1,7 @@
 import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple
+import numpy as np
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -12,6 +13,15 @@ from .image import Image, ImageCollection
 from .model_handler import ModelHandler
 
 
+def filter_label_array(array, target_labels, labels):
+    """Label array of shape (n, m) where n is the number of images and m is the number of labels.\
+        Selects columns of target labels and returns a new array of shape (n, len(target_labels))"""
+
+    select = [labels.index(_) for _ in target_labels]
+    array = array[:, select]
+    return array
+
+
 class DbHandler:
     def __init__(self, url):
         self.client = MongoClient(url, connectTimeoutMS=200, retryWrites=True)
@@ -21,6 +31,7 @@ class DbHandler:
         self.image_collection = self.db.ImageCollection
         self.multilabel_annotation = self.db.MultilabelAnnotation
         self.video_segmentation = self.db.VideoSegmentation
+        self.model = self.db.Model
 
     def clear_all(self):
         print("Deactivated")
@@ -82,11 +93,13 @@ class DbHandler:
                 {"$set": {"path": path.as_posix(), "is_extracted": True}},
             )
 
-    def get_multilabel_train_data(self):
-        img_ids = {
-            i: _["image_id"] for i, _ in enumerate(self.multilabel_annotation.find({}))
-        }
-        train, val = train_test_split(img_ids, test_size=0.2)
+    def get_multilabel_train_data(self, test_size = 0.1):
+        img_ids = [
+            _["image_id"] for _ in self.multilabel_annotation.find({})
+        ]
+        train, val = train_test_split(img_ids, test_size=test_size)
+        train = {i: _id for i, _id in enumerate(train)}
+        val = {i: _id for i, _id in enumerate(val)}
         train_collection = ImageCollection(type="multilabel_train", images=train)
         train_collection_id = self.image_collection.insert_one(
             train_collection.to_dict()
@@ -131,7 +144,14 @@ class DbHandler:
 
         return images
 
-    def prepare_ds_from_image_collection(self, image_collection_id, predict=False):
+    def get_model_settings(self, model_id:ObjectId):
+        settings = self.model.find_one({"_id": model_id})
+        trainer_settings = settings["trainer"]
+        model_settings = settings["model"]
+
+        return model_settings, trainer_settings
+
+    def prepare_ds_from_image_collection(self, image_collection_id, predict=False, target_labels=None):
         image_collection = self.image_collection.find_one({"_id": image_collection_id})
         paths = []
         _ids = []
@@ -168,8 +188,10 @@ class DbHandler:
                     continue
 
         if predict:
-            labels = _ids
+            labels = [str(_) for _ in _ids]
         else:
+            assert target_labels
+
             for _id in _ids:
                 annotation = self.get_multilabel_image_annotation(_id)
                 annotation = annotation.latest_annotation()
@@ -180,7 +202,25 @@ class DbHandler:
 
                 labels.append(annotation.value)
 
+            label_records = []
+            for label in labels:
+                record = []
+                for i, _ in enumerate(choices):
+                    if i in label:
+                        record.append(1.0)
+                    else: record.append(0.0)
+                label_records.append(record)
+
+            labels = np.array(label_records, dtype = float)
+            labels = filter_label_array(labels, target_labels, choices)
+
         return paths, labels, crop, choices
+
+    def get_examination_image_collection(self, examination_id: ObjectId):
+        image_collection = self.image_collection.find_one(
+            {"examination_id": examination_id}
+        )
+        return ImageCollection(**image_collection)
 
     def get_examination_frame_dict(self, examination_id: ObjectId):
         image_collection = self.image_collection.find_one(

@@ -30,7 +30,14 @@ class Image(BaseModel):
             _["path"] = str(self.path)
         return _
 
+    def exists(self):
+        if self.is_extracted:
+            return self.path.exists()
+        else:
+            return False
+
 class ImageCollection(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id")
     examination_id: Optional[PyObjectId]
     model_id: Optional[PyObjectId]
     type: Optional[str]

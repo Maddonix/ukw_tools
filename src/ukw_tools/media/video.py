@@ -1,6 +1,7 @@
 from typing import Tuple, List
 from pathlib import Path
 import cv2
+import warnings
 
 
 def get_frame_name(frame_index: int) -> str:
@@ -21,6 +22,14 @@ def get_video_info(video_path: str) -> Tuple:
     cap = cv2.VideoCapture(video_path.as_posix())
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    if frame_count < 1:
+        warnings.warn("Frame count is less than 1. Trying to get frame count from video file.")
+        frame_count = 0
+        ret = True
+        while ret:
+            ret, frame = cap.read()
+            frame_count += 1
+        
     return int(fps), int(frame_count)
 
 

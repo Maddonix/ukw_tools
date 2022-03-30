@@ -32,7 +32,7 @@ class Examination(BaseModel):
     segmentation: Optional[PyObjectId]
     annotation: Optional[PyObjectId]
     prediction: Optional[PyObjectId]
-    crop: Optional[Tuple[int]] # ymin, ymax, xmin, xmax
+    crop: Optional[Tuple[int, int, int, int]] # ymin, ymax, xmin, xmax
 
     class Config:
         allow_population_by_field_name = True

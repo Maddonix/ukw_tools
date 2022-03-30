@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -19,9 +19,9 @@ class ModelHandler(BaseModel):
     model_name: str # e.g. colo_segmentation
     model_type: str # e.g. EfficientNet-B4
     labels: Optional[List[str]]
-    train_images: Optional[ImageCollection]
-    val_images: Optional[ImageCollection]
-    model_settings: Optional[Dict[str, str]]
+    train_images: Optional[ImageCollection] # change to id
+    val_images: Optional[ImageCollection] # change to id
+    model_settings: Optional[Dict[str, Any]]
     metrics: Any
 
     """
@@ -38,11 +38,10 @@ class ModelHandler(BaseModel):
     class Config:
         allow_population_by_field_name = True
 
-    def load_model_from_checkpoint(self, gpu = True, eval = True):
-        assert hasattr(self, "path"), "ModelHandler has no path attribute"
+    def load_model_from_checkpoint(self, model_path, gpu = True, eval = True):
 
         model_class = MODEL_LOOKUP[self.model_name]
-        model = model_class.load_from_checkpoint(self.path)
+        model = model_class.load_from_checkpoint(model_path)
         if gpu:
             model.cuda()
         if eval:
@@ -54,10 +53,13 @@ class ModelHandler(BaseModel):
         assert hasattr(self, "model_settings"), "ModelHandler has no model_settings attribute"
 
         model_class = MODEL_LOOKUP[self.model_name]
-        model = model_class(**self.model_settings)
+        settings = self.model_settings.copy()
+        settings["labels"] = self.labels
+        settings["model_type"] = self.model_type
+        model = model_class(**settings)
         if gpu:
             model.cuda()
         if eval:
             model.eval()
 
-        return model
+        return model, settings
