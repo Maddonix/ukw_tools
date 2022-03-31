@@ -2,6 +2,8 @@ from torch.utils.data import Dataset
 import cv2
 import torch
 from .utils import img_augmentations, crop_img, img_transforms
+import numpy as np
+import warnings
 
 
 class ImageClassificationDs(Dataset):
@@ -22,11 +24,15 @@ class ImageClassificationDs(Dataset):
         return len(self.paths)
 
     def __getitem__(self, idx):
-        img = cv2.imread(self.paths[idx])
+        try:
+            img = cv2.imread(self.paths[idx])
+            img = crop_img(img, self.crop[idx])
+        except:
+            warnings.warn(f"Failed to read image {self.paths[idx]}")
+            img = np.zeros([1024,1024,3], np.uint8)
         width = int(1024 * self.scaling / 100)
         height = int(1024 * self.scaling / 100)
 
-        img = crop_img(img, self.crop[idx])
         dim = (width, height)
         # FIXME INTER AREA?
         img = cv2.resize(img, dsize=dim, interpolation=cv2.INTER_AREA)

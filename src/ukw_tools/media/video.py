@@ -2,7 +2,7 @@ from typing import Tuple, List
 from pathlib import Path
 import cv2
 import warnings
-
+from tqdm import tqdm
 
 def get_frame_name(frame_index: int) -> str:
     """
@@ -42,7 +42,7 @@ def extract_frame_list(
 
     cap = cv2.VideoCapture(video_path.as_posix())
     saved = {}
-    for i in frame_list:
+    for i in tqdm(frame_list):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i)
         ret, frame = cap.read()
         if ret:
