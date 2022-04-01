@@ -11,6 +11,7 @@ from .annotation import ImageAnnotations, MultilabelAnnotation
 from .examination import Examination
 from .image import Image, ImageCollection
 from .model_handler import ModelHandler
+from .prediction import Prediction, VideoSegmentPrediction
 
 
 def filter_label_array(array, target_labels, labels):
@@ -30,7 +31,9 @@ class DbHandler:
         self.image = self.db.Image
         self.image_collection = self.db.ImageCollection
         self.multilabel_annotation = self.db.MultilabelAnnotation
+        self.multilabel_prediction = self.db.MultilabelPrediction
         self.video_segmentation = self.db.VideoSegmentation
+        self.video_segmentation_prediction = self.db.VideoSegmentationPrediction
         self.model = self.db.Model
 
     def clear_all(self):
@@ -231,6 +234,14 @@ class DbHandler:
 
         return {}
 
+    def get_examination_segmentation_prediction(self, examination_id:ObjectId, as_object = True):
+        _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
+        if _:
+            if as_object:
+                return VideoSegmentPrediction(**_)
+            else:
+                return _
+
     def get_multilabel_image_annotation(self, image_id: ObjectId):
         image = self.multilabel_annotation.find_one({"image_id": image_id})
         if image:
@@ -243,6 +254,12 @@ class DbHandler:
         images = [ImageAnnotations(**image) for image in images]
 
         return images
+    # def get_examination_annotations() # FIXME
+    def get_examination_predictions(self, examination_id, as_object=True):
+        r = self.multilabel_prediction.find({"examination_id": examination_id})
+        if as_object:
+            r = [Prediction(**p) for p in r]
+        return r 
 
     def set_image_annotation(
         self, image_id: ObjectId, annotation: MultilabelAnnotation
@@ -253,6 +270,9 @@ class DbHandler:
         )
         assert r.matched_count == 1
         return r
+
+    def calculate_times(self):
+        fps = self.fps
 
     # def get_report(self, _id: ObjectId, as_object = True):
     #     report = self.ASDASDASDASDASD.find_one({"examination_id": _id, "type": "report"})

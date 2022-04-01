@@ -48,3 +48,6 @@ class ImageCollection(BaseModel):
         _ = self.dict(exclude_none=True)
         _["images"] = {str(k):v for k,v in _["images"].items()}
         return _
+
+    def frame_id(self, n: int):
+        return self.images[n]

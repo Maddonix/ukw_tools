@@ -30,10 +30,11 @@ class ImageClassificationDs(Dataset):
         except:
             warnings.warn(f"Failed to read image {self.paths[idx]}")
             img = np.zeros([1024,1024,3], np.uint8)
+        
         width = int(1024 * self.scaling / 100)
         height = int(1024 * self.scaling / 100)
-
         dim = (width, height)
+        
         # FIXME INTER AREA?
         img = cv2.resize(img, dsize=dim, interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
