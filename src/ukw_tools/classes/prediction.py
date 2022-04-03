@@ -48,6 +48,7 @@ class VideoSegmentPrediction(BaseModel):
     prediction_segments: Optional[Dict[str, List[List[int]]]]
     prediction_smooth_segments: Optional[Dict[str, List[List[int]]]]
     prediction_wt_segments: Optional[Dict[str, List[List[int]]]]
+    
     predicted_times: Optional[Dict[str, float]]
     choices: Optional[List[str]]
 

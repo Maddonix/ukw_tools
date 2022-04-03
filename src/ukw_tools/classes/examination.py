@@ -10,6 +10,7 @@ from pydantic import (
 )
 
 from .base import PyObjectId
+from datetime import datetime as dt
 from ..media.video import get_video_info
 
 class Examination(BaseModel):
@@ -21,6 +22,7 @@ class Examination(BaseModel):
     video_key: Optional[str]
     id_extern: Optional[int]
     examiners: Optional[List[str]]
+    date: Optional[dt]
     age: Optional[int]
     gender: Optional[int]
     path: Optional[Path]
