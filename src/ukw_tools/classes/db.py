@@ -12,6 +12,10 @@ from .examination import Examination
 from .image import Image, ImageCollection
 from .model_handler import ModelHandler
 from .prediction import Prediction, VideoSegmentPrediction
+from ..extern.requests import get_extern_examinations
+from .report import Report
+from .video_segmentation import VideoSegmentation
+import warnings
 
 
 def filter_label_array(array, target_labels, labels):
@@ -34,6 +38,7 @@ class DbHandler:
         self.multilabel_prediction = self.db.MultilabelPrediction
         self.video_segmentation = self.db.VideoSegmentation
         self.video_segmentation_prediction = self.db.VideoSegmentationPrediction
+        self.report = self.db.Report
         self.model = self.db.Model
 
     def clear_all(self):
@@ -234,6 +239,14 @@ class DbHandler:
 
         return {}
 
+    def get_examination_segmentation_annotation(self, examination_id:ObjectId, as_object = True):
+        _ = self.video_segmentation.find_one({"examination_id": examination_id})
+        if _:
+            if as_object:
+                return VideoSegmentation(**_)
+            else:
+                return _
+
     def get_examination_segmentation_prediction(self, examination_id:ObjectId, as_object = True):
         _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
         if _:
@@ -271,8 +284,67 @@ class DbHandler:
         assert r.matched_count == 1
         return r
 
-    def calculate_times(self):
-        fps = self.fps
+    def get_examination_id_from_video_key(self, video_key: str):
+        examination = self.examination.find_one({"video_key": video_key})
+        if examination:
+            return examination["_id"]
+        else:
+            warnings.warn(f"VIDEO KEY NOT FOUND {video_key}")
+            return None
+
+    def get_report_by_examination_id(self, examination_id: ObjectId):
+        report = self.report.find_one({"examination_id": examination_id})
+        if report:
+            return Report(**report)
+
+        return {}
+    
+    def get_report(self, report_id: ObjectId):
+        report = self.report.find_one({"_id": report_id})
+        if report:
+            return Report(**report)
+
+        return {}
+
+    def sync_extern_examinations(self, url, auth):
+        extern_examinations = get_extern_examinations(url, auth)
+        existing_ids = self.examination.distinct("id_extern")
+        new_extern_examinations = [e for e in extern_examinations if e.id_extern not in existing_ids]
+        new_examinations = [Examination(**e.examination()) for e in new_extern_examinations]
+
+        existing_video_keys = self.examination.distinct("video_key")
+        new_examinations = [e for e in new_examinations if e.video_key not in existing_video_keys]
+
+        for examination in new_examinations:
+            _dict = examination.to_dict()
+            self.examination.insert_one(_dict)
+
+        return len(new_examinations)
+
+    def sync_extern_reports(self, url, auth):
+        extern_examinations = get_extern_examinations(url, auth)
+        existing_report_ids = self.report.distinct("id_extern")
+        new_reports = [r.report() for r in extern_examinations if r.id_extern not in existing_report_ids]
+
+
+        skip = []
+        insert_reports = []
+        for i, report in enumerate(new_reports):
+            examination = self.examination.find_one({'id_extern': report['id_extern']})
+            # assert examination
+            if not examination:
+                print("Skipped report with extern video id {}".format(report["id_extern"]))
+                skip.append(i)
+            else:
+                report['examination_id'] = examination['_id']
+                insert_reports.append(Report(**report))
+
+        return len(insert_reports)
+
+
+
+    # def calculate_times(self):
+    #     fps = self.fps
 
     # def get_report(self, _id: ObjectId, as_object = True):
     #     report = self.ASDASDASDASDASD.find_one({"examination_id": _id, "type": "report"})

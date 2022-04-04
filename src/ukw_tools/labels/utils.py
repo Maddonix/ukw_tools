@@ -62,7 +62,7 @@ def calculate_smooth_predictions(df, choices, conv_len=25, future_frames=True, d
 
     return df_smooth
 
-def predictions_to_array(predictions, pred_smooth=False):
+def predictions_to_array(predictions, pred_smooth=False, raw = False):
     image_id = []
     choices = None
     preds = []
@@ -81,8 +81,9 @@ def predictions_to_array(predictions, pred_smooth=False):
             preds.append(p.prediction)
 
     preds = np.array(preds)
-    preds[preds > 0.5] = 1
-    preds[preds <= 0.5] = 0
+    if not raw:
+        preds[preds > 0.5] = 1
+        preds[preds <= 0.5] = 0
     df = pd.DataFrame({"image_id": image_id, "n_frame": n_frame})
     for i, choice in enumerate(choices):
         df[choice] = preds[:, i]
@@ -92,12 +93,19 @@ def predictions_to_array(predictions, pred_smooth=False):
 
 def map_df(df, wt_map_lookup):
     mapped_df = pd.DataFrame()
-    mapped_df["image_id"] = df["image_id"]
-    mapped_df["n_frame"] = df["n_frame"]
+    if "image_id" in df.columns:
+        mapped_df["image_id"] = df["image_id"]
+    if "n_frame" in df.columns:
+        mapped_df["n_frame"] = df["n_frame"]
+    else:
+        mapped_df["n_frame"] = df["n"]
+
+    # set all to 0
+    values = list(set(list(wt_map_lookup.values())))
+    for value in values:
+        mapped_df[value] = 0
 
     for key, value in wt_map_lookup.items():
-        if not value in mapped_df.columns:
-            mapped_df[value] = 0
         if key in df.columns:
             select = df[key] == 1
             mapped_df.loc[select, value] = 1

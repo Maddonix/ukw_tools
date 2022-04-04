@@ -7,6 +7,7 @@ from pathlib import Path
 from ..classes.annotation import Flank
 
 from datetime import datetime, tzinfo
+from .utils import ORIGIN_LOOKUP
 
 INTERVENTION_TYPE_MAPPING = {
     "Coloscopy": "Koloskopie",
@@ -54,6 +55,33 @@ class VideoExtern(BaseModel):
         _type = INTERVENTION_TYPE_MAPPING[_type]
         return _type
 
+    def examination(self):
+        return {
+            "id_extern": self.id_extern,
+            "path": str(self.path),
+            "video_key": self.path.name,
+            "is_video": True,
+            "origin": self.origin,
+            "origin_category": ORIGIN_LOOKUP[self.origin],
+            "examination_type": self.map_intervention_type()
+        }
+
+    def report(self):
+        if hasattr(self, "intervention_histo_text"):
+            histo_report = self.intervention_histo_text
+        else: histo_report = None
+
+        if hasattr(self, "intervention_report_text"):
+            examination_report = self.intervention_report_text
+        else: examination_report = None
+
+        report = {
+            "examination": examination_report,
+            "histo": histo_report,
+            "id_extern": self.id_extern,
+        }
+
+        return report
     
         # metadata_dict = self.get_video_meta()
         # metadata_dict["path"] = self.path

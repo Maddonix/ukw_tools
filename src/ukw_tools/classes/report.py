@@ -8,7 +8,21 @@ from .utils import POLYP_EVALUATION_STRUCTURE
 
 
 class ReportPolypAnnotationResult(BaseModel):
-    location_segment_options = ["rectum", "sigma", "left_colon", "right_colon", "ascendens", "transversum", "descendens", "caecum", "other", "unknown"]
+    location_segment_options = [
+        "unknown",
+        "rectum",
+        "sigma",
+        "descendens",
+        "transversum",
+        "ascendens",
+        "caecum",
+        "terminal_ileum",
+        "neoterminal_ileum",
+        "right_flexure",
+        "left_flexure",
+        "right_colon",
+        "left_colon"
+    ]
     location_segment: str = "unknown"
     location_cm: int = -1
     size_category_options = ["<5", "5-10", ">10-20", ">20", "unknown"]
@@ -16,15 +30,39 @@ class ReportPolypAnnotationResult(BaseModel):
     size_mm: int = -1
     surface_intact_options = ["true", "false", "unknown"]
     surface_intact: Union[bool, str] = "unknown"
-    rating_options = ["ADD STUFFFFFFFFFFFFFFF", "unknown"]
+    rating_options =[
+        "unknown",
+        "hyperplastic",
+        "adenoma",
+        "ssa",
+        "inflammatory",
+        "dalm",
+        "malign"
+    ]
     rating: str = "unknown"
-    paris_options = ["0", "Is", "Ip", "IIa", "IIb", "IIc", "III"]
+    paris_options = [
+        "unknown",
+        "Is",
+        "Ip",
+        "Ix",
+        "IIa",
+        "IIb",
+        "IIc",
+        "IIx"
+    ]        
     paris: List[str] = []
-    dysplasia_options = ["No", "low-grade", "high-grade", "unknown"]
+    dysplasia_options = [
+            "unknown", "no", "low", "high"
+        ]
     dysplasia: str = "unknown"
-    histo_options = ["ASDASDASDASD", "unknown"]
+    histo_options =   ["unknown", "non_adenoma", "tubular_adenoma", "tubulovillous_adenoma", "sessil_serrated_lesion", "carcinoma", "not_evaluated"]
     histo: str = "unknown"
-    morphology_options = ["ASDASDASD", "unknown"]
+    morphology_options = [
+        "unknown",
+        "sessil",
+        "flach",
+        "gestielt"
+    ]
     morphology: str = "unknown"
     nice_options = ["ASDASD", "unknown"]
     nice: str = "unknown"
@@ -35,7 +73,7 @@ class ReportPolypAnnotationResult(BaseModel):
     injection_options = ["true", "false", "unknown"]
     injection: Union[bool, str] = "unknown"
 
-    tool_options = ["grasper", "snare", "snare_hot", "snare_cold", "unknown"]
+    tool_options = ["unknown", "grasper", "sling_hot", "sling_cold", "sling"]
     tool: str = "unknown"
     resection_technique_options = ["enbloc", "piecemeal", "biopsy", "unknown"]
     resection_technique: str = "unknown"
@@ -47,14 +85,14 @@ class ReportPolypAnnotationResult(BaseModel):
     apc_watts: int = -1
     number_clips: int = -1
 
-    ectomy_wound_care_sucess_options = ["asdasdasdasdasdasd", "unknown"]
+    ectomy_wound_care_sucess_options = ["unknown", "preventive", "hemostasis", "no_hemostasis", "reactivation_hemostasis", "reactivation_no_hemostasis"]
     ectomy_wound_care_success: str = "unknown"
-    ectomy_wound_care_technique_options = ["asdasdasdasdasdasd", "unknown"]
+    ectomy_wound_care_technique_options = ["unknown", "clip", "apc"]
     ectomy_wound_care_technique: str = "unknown"
     ectomy_wound_care_options = ["true", "false", "unknown"]
     ectomy_wound_care: Union[bool, str] = "unknown"
 
-    no_resection_reason_options = ["asdasdasdasdasdasd", "unknown"]
+    no_resection_reason_options = ["unknown", "provided"]
     no_resection_reason: str = "unknown"
 
     resection: bool = False
@@ -168,19 +206,24 @@ class ReportPolypAnnotationResult(BaseModel):
         return result
 
 
-
 class ReportAnnotationResult(BaseModel):
     polyps: List[ReportPolypAnnotationResult] = []
     intervention_time: int = -1
     withdrawal_time: int = -1
-    sedation_options = ["ASDASDASDASD", "unknown"]
+    sedation_options = ["unknown", "no", "propofol", "midazolam", "propofol+midazolam", "other"]
     sedation: str = "unknown"
     bbps_worst: int = -1
     bbps_total: int = -1
     n_polyps: int = 0
     n_adenoma: int = 0
     other_pathologies: bool = False
-    indication_options = ["screening", "surveillance", "symptomatic", "other", "unknown"]
+    indication_options = [
+        "screening",
+        "surveillance",
+        "symptomatic",
+        "other",
+        "unknown",
+    ]
     indication: str = "unknown"
     mark_other: bool = False
 
@@ -224,6 +267,11 @@ class ReportAnnotationResult(BaseModel):
     #     return v
 
 
-class Report:
-    text: str
-    structured: Optional[Dict[str, str]]
+class Report(BaseModel):
+    examination: Optional[str]
+    histo: Optional[str]
+    examination_structured: Optional[Dict[str, str]]
+    histo_structured: Optional[Dict[str, str]]
+    report_annotation: Optional[ReportAnnotationResult]
+    examination_id: PyObjectId
+    id_extern: Optional[int]

@@ -43,12 +43,28 @@ def convert_extern_annotation(annotation):
     flanks.sort(key=lambda x: x.start)
     return flanks, max_date
 
+def flanks_to_annotation_segments(flanks):
+    segments = {}
+    for flank in flanks:
+        name = flank.name
+        if name == "body":
+            continue
+
+        if not name in segments:
+            segments[name] = []
+            
+        if flank.value == True:
+            segments[name].append([flank.start, flank.stop])
+
+    return segments
+
+
 def extern_to_intern_video_annotation(examination_id: ObjectId, annotation):
     flanks, max_date = convert_extern_annotation(annotation)
+    segments = flanks_to_annotation_segments(flanks)
     segmentation_dict = {
         "examination_id": examination_id,
-        "annotation": flanks
+        "annotation_segments": segments
     }
     segmentation = VideoSegmentation(**segmentation_dict)
-
     return segmentation

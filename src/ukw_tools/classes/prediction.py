@@ -18,6 +18,7 @@ WT_MAPPING = {
     "intervention": ["nbi", "tool", "snare", "grasper", "needle", "clip", "polyp", "blood", "water_jet"],
     "outside": ["outside"]
 }
+
 wt_map_lookup = {}
 for key, value in WT_MAPPING.items():
     for v in value:
@@ -35,16 +36,15 @@ class Prediction(BaseModel):
     n: Optional[int]
 
 class VideoSegmentPrediction(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id")
     examination_id: PyObjectId
     wt_map_lookup: Dict[str, str] = wt_map_lookup
     fps: Optional[int]
     frame_count: Optional[int]
 
-    annotation_df: Optional[pd.DataFrame]
     prediction_df: Optional[pd.DataFrame]
     prediction_smooth_df: Optional[pd.DataFrame]
     prediction_wt_df: Optional[pd.DataFrame]
-    annotation_segments: Optional[Dict[str, List[List[int]]]]
     prediction_segments: Optional[Dict[str, List[List[int]]]]
     prediction_smooth_segments: Optional[Dict[str, List[List[int]]]]
     prediction_wt_segments: Optional[Dict[str, List[List[int]]]]
@@ -112,6 +112,8 @@ class VideoSegmentPrediction(BaseModel):
         for key, value in segments.items():
             if key == "low_quality": 
                 continue
+            if key == "polyp":
+                max_diff = self.fps*15
             segments[key] = merge_nearby_segments(value, max_diff)
 
         return segments
@@ -195,7 +197,7 @@ class VideoSegmentPrediction(BaseModel):
             "examination_id": self.examination_id
         },{
             "$set": self.to_dict()
-        }
+        }, upsert = True
         )
 
 

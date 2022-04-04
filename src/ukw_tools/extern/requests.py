@@ -1,6 +1,6 @@
 import requests
 from urllib3.exceptions import InsecureRequestWarning
-from .classes import ExternAnnotatedVideo, ExternVideoFlankAnnotation
+from .classes import ExternAnnotatedVideo, ExternVideoFlankAnnotation, VideoExtern
 from .smartie import process_smartie_record
 import pandas as pd
 
@@ -29,3 +29,10 @@ def get_smartie_data(url, auth, as_df = True):
         r = [process_smartie_record(_) for _ in r]
         r = pd.DataFrame.from_records(r)
     return r
+
+def get_extern_examinations(url, auth):
+    r = requests.get(f"{url}/GetVideosExtern", auth=auth, verify=False)
+    assert r.status_code == 200
+    videos = [VideoExtern(**_) for _ in r.json()]
+
+    return videos
