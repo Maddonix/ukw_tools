@@ -27,6 +27,9 @@ class MultilabelAnnotation(Annotation):
     choices: List[str]
     instance_id: Optional[PyObjectId]
 
+    def get_labels(self):
+        return [self.choices[i] for i in self.value]
+
 
 class ImageAnnotations(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")
@@ -39,6 +42,7 @@ class ImageAnnotations(BaseModel):
 
     def latest_annotation(self):
         date = None
+        selected_key = None
         for key, value in self.annotations.items():
             if not date:
                 date = value.date
@@ -46,8 +50,9 @@ class ImageAnnotations(BaseModel):
             if value.date > date:
                 date = value.date
                 selected_key = key
-
-        return self.annotations[selected_key]
+        if selected_key:
+            return self.annotations[selected_key]
+        else: return None
 
     def to_dict(self):
         _ = self.dict(exclude_none=True)

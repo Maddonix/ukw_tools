@@ -2,6 +2,7 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple
 import numpy as np
+import pandas as pd
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -16,6 +17,7 @@ from ..extern.requests import get_extern_examinations
 from .report import Report
 from .video_segmentation import VideoSegmentation
 import warnings
+from .evaluator import Evaluator
 
 
 def filter_label_array(array, target_labels, labels):
@@ -40,6 +42,7 @@ class DbHandler:
         self.video_segmentation_prediction = self.db.VideoSegmentationPrediction
         self.report = self.db.Report
         self.model = self.db.Model
+        self.evaluator = self.db.Evaluator
 
     def clear_all(self):
         print("Deactivated")
@@ -101,11 +104,25 @@ class DbHandler:
                 {"$set": {"path": path.as_posix(), "is_extracted": True}},
             )
 
-    def get_multilabel_train_data(self, test_size = 0.1):
+    def get_multilabel_train_data(self, test_size = 0.1, exclude_examination_ids = []):
         img_ids = [
-            _["image_id"] for _ in self.multilabel_annotation.find({})
+            _["image_id"] for _ in self.multilabel_annotation.find(
+                {"examination_id": {"$nin": exclude_examination_ids},
+                "annotations": {
+                    "$nin": [
+                        None,
+                        [],
+                        {}
+                    ]
+                },
+                }
+            )
         ]
         train, val = train_test_split(img_ids, test_size=test_size)
+        print("GENERATED DATASETS")
+        print(f"Train: {len(train)}")
+        print(f"Val: {len(val)}")
+        
         train = {i: _id for i, _id in enumerate(train)}
         val = {i: _id for i, _id in enumerate(val)}
         train_collection = ImageCollection(type="multilabel_train", images=train)
@@ -158,6 +175,21 @@ class DbHandler:
         model_settings = settings["model"]
 
         return model_settings, trainer_settings
+
+    def describe_image_collection(self, collection_id: ObjectId):
+        collection = self.image_collection.find_one({"_id": collection_id})
+        images = self.image.find({"_id": {"$in": list(collection["images"].values())}})
+        images = [_ for _ in images]
+        df = pd.DataFrame.from_records(images)
+
+        r = {
+            "n": len(df),
+            "origin": df.origin.value_counts().to_dict(),
+            "origin_category": df.origin_category.value_counts().to_dict(),
+            "n_examinations": len(list(df.examination_id.unique())),
+        }
+
+        return r
 
     def prepare_ds_from_image_collection(self, image_collection_id, predict=False, target_labels=None):
         image_collection = self.image_collection.find_one({"_id": image_collection_id})
@@ -248,13 +280,85 @@ class DbHandler:
                 return _
 
     def get_examination_segmentation_prediction(self, examination_id:ObjectId, as_object = True):
-        _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
-        if _:
-            if as_object:
-                return VideoSegmentPrediction(**_)
-            else:
-                return _
+        try:
+            _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
+            if _:
+                for k, v in _["predicted_times"].items():
+                    if isinstance(v, list):
+                        _["predicted_times"][k] = None
 
+                if as_object:
+                    return VideoSegmentPrediction(**_)
+                else:
+                    return _
+
+            else:
+                _ = VideoSegmentPrediction(examination_id=examination_id)
+                _.initialize(self, calculate_smooth=True)
+                _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
+                
+                if as_object:
+                    return VideoSegmentPrediction(**_)
+                else:
+                    return _
+
+        except: 
+            _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
+            print(_)
+            raise Exception
+
+    def generate_examination_evaluator(self, examination_id):
+        prediction = self.get_examination_segmentation_prediction(examination_id)
+        if not prediction:
+            pred = VideoSegmentPrediction(examination_id=examination_id)
+            pred.initialize(self)
+            prediction = self.get_examination_segmentation_prediction(examination_id)
+            
+        prediction_id = prediction.id
+            
+        annotation = self.get_examination_segmentation_annotation(examination_id)
+        if annotation:
+            annotation_id = annotation.id
+        else:
+            annotation_id = None
+            
+        return Evaluator(
+            examination_id = examination_id,
+            annotation_id = annotation_id,
+            prediction_id = prediction_id,
+            db = self
+        )
+
+    def get_examination_evaluator(self, examination_id, refresh = False):
+        if refresh:
+            _ = self.generate_examination_evaluator(examination_id)
+            _.get_report_dictionary()
+            self.evaluator.update_one(
+                {"examination_id": examination_id},
+                {"$set": _.to_dict()},
+                upsert = True
+                )
+            _ = self.evaluator.find_one({"examination_id": examination_id})
+            _["db"] = self
+            _ = Evaluator(**_)
+            
+        else:
+            _ = self.evaluator.find_one({"examination_id": examination_id})
+            if _:
+                _["db"] = self
+                _ = Evaluator(**_)
+            else:
+                _ = self.generate_examination_evaluator(examination_id)
+                _.get_report_dictionary()
+                self.evaluator.update_one(
+                    {"examination_id": examination_id},
+                    {"$set": _.to_dict()},
+                    upsert = True
+                    )
+                _ = self.evaluator.find_one({"examination_id": examination_id})
+                _["db"] = self
+                _ = Evaluator(**_)
+        return _
     def get_multilabel_image_annotation(self, image_id: ObjectId):
         image = self.multilabel_annotation.find_one({"image_id": image_id})
         if image:
@@ -283,6 +387,10 @@ class DbHandler:
         )
         assert r.matched_count == 1
         return r
+
+    def get_image_path(self, image_id):
+        path = self.image.find_one({"_id": image_id})["path"]
+        return Path(path)
 
     def get_examination_id_from_video_key(self, video_key: str):
         examination = self.examination.find_one({"video_key": video_key})

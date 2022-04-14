@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Union, Any
 from .base import PyObjectId
 import pandas as pd
+import numpy as np
 from ..labels.utils import (
     predictions_to_array,
     calculate_smooth_predictions,
@@ -49,7 +50,7 @@ class VideoSegmentPrediction(BaseModel):
     prediction_smooth_segments: Optional[Dict[str, List[List[int]]]]
     prediction_wt_segments: Optional[Dict[str, List[List[int]]]]
     
-    predicted_times: Optional[Dict[str, float]]
+    predicted_times: Optional[Dict[str, Optional[float]]]
     choices: Optional[List[str]]
 
     class Config:
@@ -112,9 +113,13 @@ class VideoSegmentPrediction(BaseModel):
         for key, value in segments.items():
             if key == "low_quality": 
                 continue
-            if key == "polyp":
-                max_diff = self.fps*15
+            if key == "intervention":
+                max_diff = self.fps*30
             segments[key] = merge_nearby_segments(value, max_diff)
+
+        # if "caecum" in labels:
+        #     _max = self.frame_count
+        #     if 
 
         return segments
 
@@ -135,9 +140,27 @@ class VideoSegmentPrediction(BaseModel):
                 stop = _stop
         
         new["insertion"] = [(start, segments["caecum"][0][0])]
-        new["caecum"] = [(segments["caecum"][0][0], segments["caecum"][-1][1])]
+        
+        _caecum = [(segments["caecum"][0][0], segments["caecum"][-1][1])]
+        # sanity check
+        print(_caecum)
+        _len = len(segments["caecum"])
+        i = _len - 2
+        _wt_tuple = [_caecum[0][1], stop]
+        _t = range_tuple_to_time(_wt_tuple, self.fps)
+        print(_t)
+        while i >= 0 and _t<100:
+            print("RECALC")
+            _caecum = [(segments["caecum"][0][0], segments["caecum"][i][1])]
+            _wt_tuple = [_caecum[0][1], stop]
+            _t = range_tuple_to_time(_wt_tuple, self.fps)
+            i -= 1
+            print(_caecum, _t)
+
+
+        new["caecum"] = _caecum
         new["intervention"] = segments["intervention"]
-        new["withdrawal"] = [(segments["caecum"][-1][1], stop)]
+        new["withdrawal"] = [(new["caecum"][-1][1], stop)]
 
         return new
 
@@ -180,18 +203,24 @@ class VideoSegmentPrediction(BaseModel):
         self.prediction_smooth_segments = self.get_segments(
             self.prediction_smooth_df,
             self.choices,
-            max_diff=self.fps*5,
-            min_length=self.fps*1
+            max_diff=self.fps*10,
+            min_length=self.fps*1.5
         )
 
         self.prediction_wt_segments = self.get_segments(
             self.prediction_wt_df,
             list(WT_MAPPING.keys()),
-            max_diff=self.fps*5,
-            min_length=self.fps*1
+            max_diff=self.fps*10,
+            min_length=self.fps*1.5
         )
         self.prediction_wt_segments = self.post_process_wt_segments(self.prediction_wt_segments)
-        self.predicted_times = self.calculate_times(self.prediction_wt_segments)
+        if self.prediction_wt_segments:
+            self.predicted_times = self.calculate_times(self.prediction_wt_segments)
+        else:
+            categories = ["insertion", "caecum", "withdrawal"]
+            self.predicted_times = {cat:None for cat in categories}
+            for cat in categories:
+                self.predicted_times[f"{cat}_corrected"] = None
 
         db.video_segmentation_prediction.update_one({
             "examination_id": self.examination_id

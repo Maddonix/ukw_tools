@@ -34,6 +34,8 @@ class VideoSegmentation(BaseModel):
     annotation_wt_segments:Optional[Dict[str, List[List[int]]]]
     examination_id: Optional[PyObjectId]
     annotated_times: Optional[Dict[str, float]]
+    wt_freeze_0: Optional[float]
+    wt_freeze_1: Optional[float]
 
     class Config:
         arbitrary_types_allowed = True
@@ -65,6 +67,10 @@ class VideoSegmentation(BaseModel):
             if _stop > self.frame_count/2:
                 stop = _stop
 
+        # Caecum sanity check:
+        # c_start_index = 0
+        # c_stop_index = 0
+        # for i, c in enumerate(segments["caecum"]):
             
         
         new["insertion"] = [(start, segments["caecum"][0][0])]
@@ -73,7 +79,11 @@ class VideoSegmentation(BaseModel):
         new["withdrawal"] = [(segments["caecum"][-1][1], stop)]
 
         return new
-
+    def get_plot_df(self, segmentation):
+        return segmentation_to_plot_df(
+            segmentation, self.frame_count
+        )
+        
     def get_wt_segments(self):
         plot_df = segmentation_to_plot_df(self.annotation_segments, self.frame_count)
         plot_df_wide = plot_df.pivot(index = "n", columns = "label", values = "value").fillna(0).reset_index()
@@ -85,7 +95,30 @@ class VideoSegmentation(BaseModel):
         return segments
 
     def calculate_wt_from_freezes(self):
-        pass
+        freezes = self.annotation_segments["freeze"]
+        caecum = [
+            self.annotation_segments["caecum"][0][0],
+            self.annotation_segments["caecum"][-1][1]
+        ]
+        freezes = [_ for _ in freezes if _[0] > caecum[0] and _[0] < caecum[1]]
+
+        if not freezes:
+            return None, None
+
+        if not self.annotation_segments["outside"]:
+            wt_end = self.frame_count
+        else:
+            wt_end = self.annotation_segments["outside"][-1][0]
+            if wt_end < caecum[1]:
+                wt_end = self.frame_count
+
+        wt_0 = range_tuple_to_time([freezes[0][0], wt_end], self.fps)
+        wt_1 = range_tuple_to_time([freezes[-1][0], wt_end], self.fps)
+
+        self.wt_freeze_0 = wt_0
+        self.wt_freeze_1 = wt_1
+
+        return wt_0, wt_1
 
     def calculate_times(self, segments):
         times = {}
@@ -108,3 +141,11 @@ class VideoSegmentation(BaseModel):
             times[f"{category}_corrected"] = times[category] - interventions[category]
 
         return times
+
+    # def get_fps(self, db):
+    #     examination = db.get_examination(self.examination_id)
+    #     self.fps = examination.fps
+    #     self.frame_count = examination.frame_count
+    #     return examination.fps
+
+    

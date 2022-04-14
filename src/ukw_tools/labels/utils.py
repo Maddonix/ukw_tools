@@ -44,7 +44,7 @@ def calculate_smooth_predictions(df, choices, conv_len=25, future_frames=True, d
     df_smooth = df.copy()
 
     for choice in choices:
-        df_smooth[choice] = running_mean(df[choice], conv_len=conv_len, future_frames = future_frames)
+        df_smooth[choice] = running_mean(df[choice], conv_len=conv_len, future_frames = future_frames, threshold = 0.5)
 
     if ignore_low_quality:
         select = df_smooth["low_quality"] == 1
