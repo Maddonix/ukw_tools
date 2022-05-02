@@ -64,9 +64,9 @@ class ReportPolypAnnotationResult(BaseModel):
         "gestielt"
     ]
     morphology: str = "unknown"
-    nice_options = ["ASDASD", "unknown"]
+    nice_options = ["unknown","I","II","III"]
     nice: str = "unknown"
-    lst_options = ["ASDASD", "unknown"]
+    lst_options = ["unknown", "granular", "non_granular", "mixed"]
     lst: str = "unknown"
     non_lifting_sign_options = ["true", "false", "unknown"]
     non_lifting_sign: Union[bool, str] = "unknown"
@@ -170,6 +170,8 @@ class ReportPolypAnnotationResult(BaseModel):
         result = {"required": [], "optional": [], "found": []}
 
         for attribute, element in POLYP_EVALUATION_STRUCTURE.items():
+            if "options" in attribute:
+                continue
             if element["required"]:
                 result["required"].append(attribute)
 
@@ -186,6 +188,8 @@ class ReportPolypAnnotationResult(BaseModel):
                     result["optional"].append(attribute)
 
         for key, value in polyp_report.items():
+            if "options" in key:
+                continue
             if not value == None and not value == "unknown" and not value == -1:
                 result["found"].append(key)
 
@@ -204,6 +208,15 @@ class ReportPolypAnnotationResult(BaseModel):
         ]
 
         return result
+
+    def evaluation_record(self):
+        r = self.evaluate()
+        record = {}
+        for key, value in r.items():
+            for attribute in value:
+                record[attribute] = key
+
+        return record
 
 
 class ReportAnnotationResult(BaseModel):
@@ -271,6 +284,7 @@ class Report(BaseModel):
     examination: Optional[str]
     histo: Optional[str]
     examination_structured: Optional[Dict[str, str]]
+    metadata: Optional[Dict]
     histo_structured: Optional[Dict[str, str]]
     report_annotation: Optional[ReportAnnotationResult]
     examination_id: PyObjectId

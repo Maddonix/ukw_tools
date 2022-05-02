@@ -125,16 +125,27 @@ class VideoSegmentation(BaseModel):
         categories = ["insertion", "caecum", "withdrawal"]
         for category in categories:
             times[category] = range_tuples_to_time(segments[category], self.fps)
-
         interventions = {cat:0 for cat in categories}
 
+ 
         for intervention_range in segments["intervention"]:
+            
             start = intervention_range[0]
+            stop = intervention_range[1]
+
             if start < segments["caecum"][0][0]:
-                interventions["insertion"] += range_tuple_to_time(intervention_range, self.fps)
-            if start < segments["withdrawal"][0][0]:
-                interventions["caecum"] += range_tuple_to_time(intervention_range, self.fps)
-            if start >= segments["withdrawal"][0][0]:
+                if stop <= segments["caecum"][0][0]:
+                    interventions["insertion"] += range_tuple_to_time(intervention_range, self.fps)
+                else:
+                    interventions["insertion"] += range_tuple_to_time([start, segments["caecum"][0][0]], self.fps)
+                    interventions["caecum"] += range_tuple_to_time([segments["caecum"][0][0], stop], self.fps)
+            elif start < segments["withdrawal"][0][0]:
+                if stop <= segments["withdrawal"][0][0]:
+                    interventions["caecum"] += range_tuple_to_time(intervention_range, self.fps)
+                else:
+                    interventions["caecum"] += range_tuple_to_time([start, segments["withdrawal"][0][0]], self.fps)
+                    interventions["withdrawal"] += range_tuple_to_time([segments["withdrawal"][0][0], stop], self.fps)
+            elif start >= segments["withdrawal"][0][0]:
                 interventions["withdrawal"] += range_tuple_to_time(intervention_range, self.fps)
 
         for category in categories:

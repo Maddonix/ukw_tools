@@ -43,6 +43,7 @@ class DbHandler:
         self.report = self.db.Report
         self.model = self.db.Model
         self.evaluator = self.db.Evaluator
+        self.examiner = self.db.Examiner
 
     def clear_all(self):
         print("Deactivated")
@@ -104,7 +105,8 @@ class DbHandler:
                 {"$set": {"path": path.as_posix(), "is_extracted": True}},
             )
 
-    def get_multilabel_train_data(self, test_size = 0.1, exclude_examination_ids = []):
+    def get_multilabel_train_data(self, test_size = 0.1, exclude_examination_ids = None):
+        if not exclude_examination_ids: exclude_examination_ids = []
         img_ids = [
             _["image_id"] for _ in self.multilabel_annotation.find(
                 {"examination_id": {"$nin": exclude_examination_ids},
@@ -168,6 +170,10 @@ class DbHandler:
             images = [_ for _ in images]
 
         return images
+
+    def get_image_number(self, _id: ObjectId):
+        image = self.image.find_one({"_id": _id})
+        return image["n"]
 
     def get_model_settings(self, model_id:ObjectId):
         settings = self.model.find_one({"_id": model_id})

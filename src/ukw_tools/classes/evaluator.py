@@ -238,10 +238,10 @@ class Evaluator(BaseModel):
                     polyp_sequence["image_id_nbi"]
                 )
 
-        landmarks = self.get_landmark_image_dict()
+        id_landmarks = self.get_landmark_image_dict()
         landmarks = {
             key: self.db.get_image_path(value)
-            for key, value in landmarks.items()
+            for key, value in id_landmarks.items()
             if value
         }
 
@@ -256,6 +256,7 @@ class Evaluator(BaseModel):
             report["annotated_times"] = None
         report["polyps"] = polyps
         report["landmarks"] = landmarks
+        report["id_landmarks"] = id_landmarks
         self.report = report
         return report
 
@@ -282,4 +283,24 @@ class Evaluator(BaseModel):
         plot = plot=get_plot(plot_df, fps)
 
         return plot
-        
+
+    def get_prediction_image_report(self):
+        elements = []
+        # _ids = []
+        # labels = []
+        for key, value in self.report["id_landmarks"].items():
+            elements.append({
+                "_id": value,
+                "label": key,
+                "path": self.report["landmarks"][key]
+            })
+
+        for p in self.report["polyps"]:
+            if p["image_id_instrument"]:
+                elements.append({
+                    "_id": p["image_id_instrument"],
+                    "label": p["instrument"],
+                    "path": p["image_path_instrument"]
+                })
+
+        return elements

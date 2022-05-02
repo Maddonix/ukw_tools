@@ -117,6 +117,7 @@ class VideoSegmentPrediction(BaseModel):
                 max_diff = self.fps*30
             segments[key] = merge_nearby_segments(value, max_diff)
 
+
         # if "caecum" in labels:
         #     _max = self.frame_count
         #     if 
@@ -178,12 +179,23 @@ class VideoSegmentPrediction(BaseModel):
         interventions = {cat:0 for cat in categories}
 
         for intervention_range in segments["intervention"]:
+            
             start = intervention_range[0]
+            stop = intervention_range[1]
+
             if start < segments["caecum"][0][0]:
-                interventions["insertion"] += range_tuple_to_time(intervention_range, self.fps)
-            if start < segments["withdrawal"][0][0]:
-                interventions["caecum"] += range_tuple_to_time(intervention_range, self.fps)
-            if start >= segments["withdrawal"][0][0]:
+                if stop <= segments["caecum"][0][0]:
+                    interventions["insertion"] += range_tuple_to_time(intervention_range, self.fps)
+                else:
+                    interventions["insertion"] += range_tuple_to_time([start, segments["caecum"][0][0]], self.fps)
+                    interventions["caecum"] += range_tuple_to_time([segments["caecum"][0][0], stop], self.fps)
+            elif start < segments["withdrawal"][0][0]:
+                if stop <= segments["withdrawal"][0][0]:
+                    interventions["caecum"] += range_tuple_to_time(intervention_range, self.fps)
+                else:
+                    interventions["caecum"] += range_tuple_to_time([start, segments["withdrawal"][0][0]], self.fps)
+                    interventions["withdrawal"] += range_tuple_to_time([segments["withdrawal"][0][0], stop], self.fps)
+            elif start >= segments["withdrawal"][0][0]:
                 interventions["withdrawal"] += range_tuple_to_time(intervention_range, self.fps)
 
         for category in categories:
@@ -206,7 +218,31 @@ class VideoSegmentPrediction(BaseModel):
             max_diff=self.fps*10,
             min_length=self.fps*1.5
         )
+        # Landmark Sanity Check:
+        n_caecum = (len(self.prediction_smooth_segments["ileum"]) + 
+            len(self.prediction_smooth_segments["appendix"]) + 
+            len(self.prediction_smooth_segments["ileocaecalvalve"])
+        )
+        if n_caecum == 0:
+            min_length = min_length=self.fps*1.5
+            _prediction_smooth_segments = self.get_segments(
+                self.prediction_smooth_df,
+                self.choices,
+                max_diff=self.fps*10,
+                min_length=min_length
+            )
+            self.prediction_smooth_segments.update({
+                "ileum": _prediction_smooth_segments["ileum"],
+                "appendix": _prediction_smooth_segments["appendix"],
+                "ileocaecalvalve": _prediction_smooth_segments["ileocaecalvalve"]}
+            )
 
+        n_caecum = (len(self.prediction_smooth_segments["ileum"]) + 
+            len(self.prediction_smooth_segments["appendix"]) + 
+            len(self.prediction_smooth_segments["ileocaecalvalve"])
+        )
+        if n_caecum == 0:
+            print("still failing")
         self.prediction_wt_segments = self.get_segments(
             self.prediction_wt_df,
             list(WT_MAPPING.keys()),
