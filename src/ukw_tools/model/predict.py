@@ -1,56 +1,14 @@
-from pathlib import Path
-
-
-from bson import ObjectId
-import json
-from ukw_tools.model.multilabel_classification_net import MultilabelClassificationNet
-from ukw_tools.dataset.image_classification import ImageClassificationDs
-from ukw_tools.classes.prediction import VideoSegmentPrediction
-import torch
+from .multilabel_classification_net import MultilabelClassificationNet
+from ..dataset.image_classification import ImageClassificationDs
+from ..classes.prediction import VideoSegmentPrediction
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+import torch
+from bson import ObjectId
 import numpy as np
+from pathlib import Path
 import os
-
-from ..classes.db import DbHandler
-from .video import extract_frame_list
-
-
-def extract_video(payload):
-    """Extracts all Frames of an examination
-
-    Args:
-        payload {"id": i, "examination": examination, "mongo_url": mongo_url}
-    """
-    db = DbHandler(payload["mongo_url"])
-    examination = payload["examination"]
-    print(examination.video_key)
-    frame_dir = Path("/extreme_storage/files/frames/").joinpath(examination.video_key)
-    if not frame_dir.exists():
-        print("DIR DOESNT EXIST, CREATING FOLDER")
-        os.mkdir(frame_dir)
-
-    image_collection = db.get_examination_image_collection(examination.id)
-    missing = []
-    id_not_extracted = []
-    n_not_extracted = []
-
-    ids = list(image_collection.images.values())
-    images = db.get_images(ids)
-    if not len(images) == len(ids):
-        _ids = [_.id for _ in images]
-        for _id in _ids:
-            if _id not in ids:
-                missing.append(_id)
-
-    for image in tqdm(images):
-        if not image.exists():
-            id_not_extracted.append(image.id)
-            n_not_extracted.append(image.n)
-
-    path_dict = extract_frame_list(examination.path, n_not_extracted, frame_dir)
-    db.update_frames_extracted(examination.id, path_dict)
-
+import json
 
 def get_examination_dataloader(
     examination_id, db, scaling = 69, batch_size=12,
@@ -77,6 +35,7 @@ def predict_batch(x, model, cuda=False):
     pred = pred.detach().cpu().numpy()
     return pred
 
+
 def prediction_to_record(pred, _y, target_labels):
     labels = [target_labels[i] for i in np.where(pred>0.5)[0]]
 
@@ -89,23 +48,15 @@ def prediction_to_record(pred, _y, target_labels):
 
     return record
 
-def predict_examination(payload):
-    db = DbHandler(payload["mongo_url"])
-    examination = payload["examination"]
-    model_id = payload["model_id"]
-    upload = payload["upload"]
-    cuda = payload["cuda"]
+def predict_examination(examination, model, model_id, db=None, cuda = True, upload = False, out = Path("./preds")):
     print(examination.video_key)
-    checkpoint_path = db.model.find_one({"_id": model_id})["trainer"]["model_path"]
-    model = MultilabelClassificationNet.load_from_checkpoint(checkpoint_path)
-    model.cuda()
-    model.eval()
-    target_labels = model.labels
-
+    if upload == False:
+        if not out.exists():
+            os.mkdir(out)
     records = []   
     target_labels = model.labels
     dl = get_examination_dataloader(
-        examination.id, db, scaling = 69, batch_size = 12,
+        examination.id, db, scaling = 70, batch_size = 12,
         num_workers = 4, shuffle = False, training = False
         )
 
@@ -119,6 +70,7 @@ def predict_examination(payload):
             record = prediction_to_record(v, y[i], target_labels)
             record["examination_id"] = examination.id
             record["n"] = frame_number_lookup[y[i]]
+            record["model_id"] = model_id
             if upload:
                 db.db.MultilabelPrediction.update_one({"image_id": y[i]}, {"$set": record}, upsert=True)
             
@@ -127,11 +79,12 @@ def predict_examination(payload):
             records.append(record)
 
 
-    with open(f"results/predictions_{examination.video_key}.json", "w") as f:
-        json.dump(records, f)
+    if not upload:
+        with open(out.joinpath(f"predictions_{examination.video_key}.json"), "w") as f:
+            json.dump(records, f)
     
     try:
         prediction = VideoSegmentPrediction(examination_id= examination.id)
         prediction.initialize(db)
     except:
-        pass
+        print("to initialize predictions!")

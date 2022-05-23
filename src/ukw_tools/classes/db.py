@@ -3,11 +3,13 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from bson import ObjectId
 from pymongo import MongoClient
 from sklearn.model_selection import train_test_split
 
+from ..media.video import get_frame_dir, get_frame_name
 from .annotation import ImageAnnotations, MultilabelAnnotation
 from .examination import Examination
 from .image import Image, ImageCollection
@@ -18,6 +20,7 @@ from .report import Report
 from .video_segmentation import VideoSegmentation
 import warnings
 from .evaluator import Evaluator
+from .instance import Instance
 
 
 def filter_label_array(array, target_labels, labels):
@@ -34,6 +37,7 @@ class DbHandler:
         self.client = MongoClient(url, connectTimeoutMS=200, retryWrites=True)
         self.db = self.client.EndoData3
         self.examination = self.db.Examination
+        self.examination_dashboard_data = self.db.ExaminationDashboardData
         self.image = self.db.Image
         self.image_collection = self.db.ImageCollection
         self.multilabel_annotation = self.db.MultilabelAnnotation
@@ -44,6 +48,9 @@ class DbHandler:
         self.model = self.db.Model
         self.evaluator = self.db.Evaluator
         self.examiner = self.db.Examiner
+        self.freeze_detection = self.db.FreezeDetection
+        self.instance = self.db.Instance
+        self.sequence = self.db.Sequence
 
     def clear_all(self):
         print("Deactivated")
@@ -77,9 +84,9 @@ class DbHandler:
         if insert_frames:
             frame_dict = self.insert_frames(frames)
 
-        self.image_collection.insert_one(
-            {"examination_id": examination.id, "type": "frame", "images": frame_dict}
-        )
+            self.image_collection.insert_one(
+                {"examination_id": examination.id, "type": "frame", "images": frame_dict}
+            )
 
     def insert_model(self, model: ModelHandler):
         model_dict = model.to_dict(exclude_none=True)
@@ -94,12 +101,15 @@ class DbHandler:
         self.examination.update_one({"_id": _id}, {"$set": {"crop": crop}})
 
     def update_frames_extracted(
-        self, examination_id: ObjectId, frame_dict: Dict[int, Path]
+        self, examination_id: ObjectId, frame_list: List[int]
     ):
+        examination = self.get_examination(examination_id)
+        frame_dir = get_frame_dir(examination.video_key)
         image_dict = self.image_collection.find_one(
             {"examination_id": examination_id, "type": "frame"}
         )
-        for n, path in frame_dict.items():
+        for n in frame_list:
+            path = frame_dir.joinpath(get_frame_name(n))
             self.image.update_one(
                 {"_id": image_dict["images"][str(n)]},
                 {"$set": {"path": path.as_posix(), "is_extracted": True}},
@@ -262,6 +272,14 @@ class DbHandler:
 
         return paths, labels, crop, choices
 
+    def get_examination_instances(self, examination_id: ObjectId):
+        instances = self.instance.find({"examination_id": examination_id})
+        if instances:
+            instances = [Instance(**_) for _ in instances]
+        else:
+            instances = []
+        return instances
+
     def get_examination_image_collection(self, examination_id: ObjectId):
         image_collection = self.image_collection.find_one(
             {"examination_id": examination_id}
@@ -300,7 +318,11 @@ class DbHandler:
 
             else:
                 _ = VideoSegmentPrediction(examination_id=examination_id)
-                _.initialize(self, calculate_smooth=True)
+                try:
+                    _.initialize(self, calculate_smooth=True)
+                except:
+                    print(examination_id)
+                    raise Exception("Could not initialize")
                 _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
                 
                 if as_object:
@@ -429,11 +451,11 @@ class DbHandler:
         existing_video_keys = self.examination.distinct("video_key")
         new_examinations = [e for e in new_examinations if e.video_key not in existing_video_keys]
 
-        for examination in new_examinations:
-            _dict = examination.to_dict()
-            self.examination.insert_one(_dict)
+        for examination in tqdm(new_examinations):
+            self.insert_examination(examination)
+            
 
-        return len(new_examinations)
+        return new_examinations
 
     def sync_extern_reports(self, url, auth):
         extern_examinations = get_extern_examinations(url, auth)
@@ -453,7 +475,7 @@ class DbHandler:
                 report['examination_id'] = examination['_id']
                 insert_reports.append(Report(**report))
 
-        return len(insert_reports)
+        return insert_reports
 
 
 

@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Union, Any
 from .base import PyObjectId
 import pandas as pd
 import numpy as np
+import warnings
 from ..labels.utils import (
     predictions_to_array,
     calculate_smooth_predictions,
@@ -16,7 +17,7 @@ from ..plot.utils import segmentation_to_plot_df
 
 WT_MAPPING = {
     "caecum": ["caecum", "ileocaecalvalve", "appendix", "ileum"],
-    "intervention": ["nbi", "tool", "snare", "grasper", "needle", "clip", "polyp", "blood", "water_jet"],
+    "intervention": ["nbi", "tool", "snare", "grasper", "needle", "clip", "polyp", "blood"],#, "water_jet"],
     "outside": ["outside"]
 }
 
@@ -80,8 +81,11 @@ class VideoSegmentPrediction(BaseModel):
     
     def get_prediction_df(self, db, smooth=False):
         preds = db.get_examination_predictions(self.examination_id)
-        prediction_df, self.choices = predictions_to_array(preds, pred_smooth = smooth)
-        return prediction_df
+        if preds:
+            prediction_df, self.choices = predictions_to_array(preds, pred_smooth = smooth)
+            return prediction_df
+        else:
+            return None
 
     def get_prediction_smooth_df(self, db, calculate_new = True):
         if calculate_new:
@@ -209,6 +213,8 @@ class VideoSegmentPrediction(BaseModel):
         # Implement get annotations
 
         self.prediction_df = self.get_prediction_df(db)
+        if not self.prediction_df:
+            warnings.warn(f"No predictions found for examination: {self.examination_id}, Pred. ID = {self.id}")
         self.prediction_smooth_df = self.get_prediction_smooth_df(db, calculate_smooth)
         self.prediction_wt_df = map_df(self.prediction_smooth_df, self.wt_map_lookup)
 

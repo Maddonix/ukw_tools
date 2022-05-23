@@ -71,11 +71,13 @@ def get_plot(df,
                 # "_type": ["annotations", "predictions", "predictions_smooth"],
                 # "name": ["outside","caecum", "tool", "nbi"]
         },
-        color_discrete_map= color_map
+        color_discrete_map= color_map,
+        custom_data = ["n"]
         )
     plot.update_traces(
         marker=dict(size=marker_size),
-        selector=dict(mode='markers'),    
+        selector=dict(mode='markers'),
+        hovertemplate = "Time: %{x}<br>Label: %{y}<br>Frame Number: %{customdata[0]}",    
         )
 
     plot.update_layout(
@@ -150,6 +152,11 @@ def add_p_value_annotation(plot, comparisons, x_labels, print_p = False, _format
         x1 = get_x_ref(x_labels.index(x_values[0]),color_indices[1],len(color_legend))
         # st.write(compare)
         # try:
+        try:
+            assert len(compare[0]) == len(compare[1])
+        except:
+            print(comparison)
+            print(len(compare[0]), len(compare[1]))
         r = analyse_stats(np.array(compare[0]), np.array(compare[1]), paired)
         p_value = r["p_value"]
         # except:

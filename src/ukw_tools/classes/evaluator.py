@@ -173,6 +173,7 @@ class Evaluator(BaseModel):
                 )
 
             p_df = self.prediction_df.loc[self.prediction_df.n_frame.isin(frame_list)]
+            p_df = p_df.loc[p_df.low_quality < 0.5]
             try:
                 select = p_df.loc[(p_df["nbi"] < 0.5) & (p_df["low_quality"] < 0.5)]
                 idx_max = select["polyp"].idxmax()
