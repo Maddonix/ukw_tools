@@ -331,9 +331,8 @@ class DbHandler:
                     return _
 
         except: 
-            _ = self.video_segmentation_prediction.find_one({"examination_id": examination_id})
-            print(_)
-            raise Exception
+            print("No prediction for {}".format(examination_id))
+            return None
 
     def generate_examination_evaluator(self, examination_id):
         prediction = self.get_examination_segmentation_prediction(examination_id)
@@ -341,8 +340,9 @@ class DbHandler:
             pred = VideoSegmentPrediction(examination_id=examination_id)
             pred.initialize(self)
             prediction = self.get_examination_segmentation_prediction(examination_id)
-            
-        prediction_id = prediction.id
+        if prediction:
+            prediction_id = prediction.id
+        else: prediction_id = None
             
         annotation = self.get_examination_segmentation_annotation(examination_id)
         if annotation:
@@ -377,15 +377,16 @@ class DbHandler:
                 _ = Evaluator(**_)
             else:
                 _ = self.generate_examination_evaluator(examination_id)
-                _.get_report_dictionary()
-                self.evaluator.update_one(
-                    {"examination_id": examination_id},
-                    {"$set": _.to_dict()},
-                    upsert = True
-                    )
-                _ = self.evaluator.find_one({"examination_id": examination_id})
-                _["db"] = self
-                _ = Evaluator(**_)
+                if _.prediction_id:
+                    _.get_report_dictionary()
+                    self.evaluator.update_one(
+                        {"examination_id": examination_id},
+                        {"$set": _.to_dict()},
+                        upsert = True
+                        )
+                    _ = self.evaluator.find_one({"examination_id": examination_id})
+                    _["db"] = self
+                    _ = Evaluator(**_)
         return _
     def get_multilabel_image_annotation(self, image_id: ObjectId):
         image = self.multilabel_annotation.find_one({"image_id": image_id})

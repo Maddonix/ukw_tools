@@ -58,6 +58,9 @@ class Evaluator(BaseModel):
             exclude_none=True,
             include={"id", "examination_id", "annotation_id", "prediction_id", "report"},
         )
+        if not "report" in new:
+            return None
+        
         _ = new["report"]
 
         if "polyps" in _:

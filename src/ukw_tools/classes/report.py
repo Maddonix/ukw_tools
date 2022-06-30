@@ -21,7 +21,7 @@ class ReportPolypAnnotationResult(BaseModel):
         "right_flexure",
         "left_flexure",
         "right_colon",
-        "left_colon"
+        "left_colon",
     ]
     location_segment: str = "unknown"
     location_cm: int = -1
@@ -30,41 +30,33 @@ class ReportPolypAnnotationResult(BaseModel):
     size_mm: int = -1
     surface_intact_options = ["true", "false", "unknown"]
     surface_intact: Union[bool, str] = "unknown"
-    rating_options =[
+    rating_options = [
         "unknown",
         "hyperplastic",
         "adenoma",
         "ssa",
         "inflammatory",
         "dalm",
-        "malign"
+        "malign",
     ]
     rating: str = "unknown"
-    paris_options = [
-        "unknown",
-        "Is",
-        "Ip",
-        "Ix",
-        "IIa",
-        "IIb",
-        "IIc",
-        "IIx"
-    ]        
+    paris_options = ["unknown", "Is", "Ip", "Ix", "IIa", "IIb", "IIc", "IIx"]
     paris: List[str] = []
-    dysplasia_options = [
-            "unknown", "no", "low", "high"
-        ]
+    dysplasia_options = ["unknown", "no", "low", "high"]
     dysplasia: str = "unknown"
-    histo_options =   ["unknown", "non_adenoma", "tubular_adenoma", "tubulovillous_adenoma", "sessil_serrated_lesion", "carcinoma", "not_evaluated"]
-    histo: str = "unknown"
-    morphology_options = [
+    histo_options = [
         "unknown",
-        "sessil",
-        "flach",
-        "gestielt"
+        "non_adenoma",
+        "tubular_adenoma",
+        "tubulovillous_adenoma",
+        "sessil_serrated_lesion",
+        "carcinoma",
+        "not_evaluated",
     ]
+    histo: str = "unknown"
+    morphology_options = ["unknown", "sessil", "flach", "gestielt"]
     morphology: str = "unknown"
-    nice_options = ["unknown","I","II","III"]
+    nice_options = ["unknown", "I", "II", "III"]
     nice: str = "unknown"
     lst_options = ["unknown", "granular", "non_granular", "mixed"]
     lst: str = "unknown"
@@ -85,7 +77,14 @@ class ReportPolypAnnotationResult(BaseModel):
     apc_watts: int = -1
     number_clips: int = -1
 
-    ectomy_wound_care_sucess_options = ["unknown", "preventive", "hemostasis", "no_hemostasis", "reactivation_hemostasis", "reactivation_no_hemostasis"]
+    ectomy_wound_care_sucess_options = [
+        "unknown",
+        "preventive",
+        "hemostasis",
+        "no_hemostasis",
+        "reactivation_hemostasis",
+        "reactivation_no_hemostasis",
+    ]
     ectomy_wound_care_success: str = "unknown"
     ectomy_wound_care_technique_options = ["unknown", "clip", "apc"]
     ectomy_wound_care_technique: str = "unknown"
@@ -223,7 +222,14 @@ class ReportAnnotationResult(BaseModel):
     polyps: List[ReportPolypAnnotationResult] = []
     intervention_time: int = -1
     withdrawal_time: int = -1
-    sedation_options = ["unknown", "no", "propofol", "midazolam", "propofol+midazolam", "other"]
+    sedation_options = [
+        "unknown",
+        "no",
+        "propofol",
+        "midazolam",
+        "propofol+midazolam",
+        "other",
+    ]
     sedation: str = "unknown"
     bbps_worst: int = -1
     bbps_total: int = -1
@@ -242,6 +248,7 @@ class ReportAnnotationResult(BaseModel):
 
     def __hash__(self):
         return hash(repr(self))
+
 
     # @validator("polyps", allow_reuse=True, pre=True)
     # def dict_to_list(cls, v):
@@ -289,3 +296,16 @@ class Report(BaseModel):
     report_annotation: Optional[ReportAnnotationResult]
     examination_id: PyObjectId
     id_extern: Optional[int]
+
+    
+    def get_df_records(self):
+        if not self.report_annotation:
+            return None, []
+        _dict = self.report_annotation.dict()
+        _dict.update({"examination_id":self.examination_id})
+        polyps = _dict["polyps"]
+        for _ in polyps:
+            _.update({"examination_id":self.examination_id})
+        del _dict["polyps"]
+        return _dict, polyps
+ 

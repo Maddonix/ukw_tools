@@ -99,14 +99,14 @@ def get_x_ref(group_index, color_index, n_color):
     return x
 
 
-def add_p_value_annotation(plot, comparisons, x_labels, print_p = False, _format=dict(interline=0.0, text_height=1.07, color='black')):
+def add_p_value_annotation(plot, comparisons, x_labels, print_p = False, _format=dict(interline=0.0, text_height=1.07, color='black'), y_range_base = (.93, .94)):
     _dict = plot.to_dict()
     _data = _dict["data"]
 
     # Get y range
     y_range = np.zeros([len(comparisons), 2])
     for i in range(len(comparisons)):
-        y_range[i] = [.93-i*_format['interline'], .94-i*_format['interline']]
+        y_range[i] = [y_range_base[0]-i*_format['interline'], y_range_base[1]-i*_format['interline']]
 
     for y_range_index, comparison in enumerate(comparisons):
         # Add Significance for groups

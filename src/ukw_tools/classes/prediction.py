@@ -133,7 +133,7 @@ class VideoSegmentPrediction(BaseModel):
 
         if not segments["caecum"]:
             print("No caecum segmentation")
-            return None
+            return segments
         start = 0
         stop = self.frame_count
         if segments["outside"]:
@@ -213,8 +213,13 @@ class VideoSegmentPrediction(BaseModel):
         # Implement get annotations
 
         self.prediction_df = self.get_prediction_df(db)
-        if not self.prediction_df:
+        if not isinstance(self.prediction_df, pd.DataFrame):
             warnings.warn(f"No predictions found for examination: {self.examination_id}, Pred. ID = {self.id}")
+            return None
+
+        if not len(self.prediction_df):
+            warnings.warn(f"No predictions found for examination: {self.examination_id}, Pred. ID = {self.id}")
+            return None
         self.prediction_smooth_df = self.get_prediction_smooth_df(db, calculate_smooth)
         self.prediction_wt_df = map_df(self.prediction_smooth_df, self.wt_map_lookup)
 
@@ -256,7 +261,7 @@ class VideoSegmentPrediction(BaseModel):
             min_length=self.fps*1.5
         )
         self.prediction_wt_segments = self.post_process_wt_segments(self.prediction_wt_segments)
-        if self.prediction_wt_segments:
+        if self.prediction_wt_segments["caecum"]:
             self.predicted_times = self.calculate_times(self.prediction_wt_segments)
         else:
             categories = ["insertion", "caecum", "withdrawal"]

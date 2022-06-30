@@ -1,6 +1,9 @@
 from ukw_tools.classes.report import ReportPolypAnnotationResult, ReportAnnotationResult
 import streamlit as st
 
+def set_upload_flag():
+    st.session_state.upload_report_annotation = True
+
 class StreamlitReportAnnotation:
     def __init__(self, report: ReportAnnotationResult):
             
@@ -210,7 +213,7 @@ class StreamlitReportAnnotation:
                 "BBPS (total)", value=self.report.bbps_total
             ),
             "indication": bc[5].selectbox("Indication", self.report.indication_options),
-            "n_polyps": bc[0].number_input("N polyps", value=self.report.n_polyps),
+            "n_polyps": bc[0].number_input("N polyps", value=self.report.n_polyps, on_change=set_upload_flag),
             "n_adenoma": bc[1].number_input("N adenoma", value=self.report.n_adenoma),
             "other_pathologies": bc[2].checkbox(
                 "Other pathologies", value=self.report.other_pathologies

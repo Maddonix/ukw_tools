@@ -25,6 +25,8 @@ class ExaminationDashboardData(BaseModel):
     frame_count: Optional[int]
     origin_category: Optional[str]
     crop: Optional[Tuple[int, int, int, int]]
+    cecum_reached: Optional[bool]
+    has_video_segmentation_prediction: Optional[bool]
 
     has_examination_report: Optional[bool]
     has_histo_report: Optional[bool]
@@ -52,13 +54,35 @@ class ExaminationDashboardData(BaseModel):
             upsert=True
         )
 
-    def refresh(self, db):
+    def refresh(self, db, upload = True):
         self.refresh_examination_data(db)
         self.refresh_is_extracted(db)
         self.refresh_report(db)
         self.refresh_freezes(db)
         self.refresh_evaluator(db)
         self.refresh_multilabel_annotations(db)
+        if self.is_video:
+            eval = db.get_examination_evaluator(self.examination_id)
+            eval.get_elements()
+            self.refresh_has_video_segmentation_prediction(db)
+        if upload:
+            self.to_db(db)
+
+    def refresh_has_video_segmentation_prediction(self, db):
+        segm_pred = db.get_examination_segmentation_prediction(self.examination_id)
+        if segm_pred:
+            self.has_video_segmentation_prediction = True
+            try:
+                self.n_detected_polyp_sequences = len(segm_pred.prediction_smooth_segments["polyp"])
+                self.cecum_reached = len(segm_pred.prediction_wt_segments["caecum"])>0
+            except:
+                print(segm_pred)
+                raise Exception
+        else:
+            self.has_video_segmentation_prediction = False
+            self.n_detected_polyp_sequences = None
+            self.cecum_reached = None
+
 
     def refresh_examination_data(self, db):
         exam = db.get_examination(self.examination_id)
